@@ -32,17 +32,15 @@
 #ifndef ZR300_NODELET
 #define ZR300_NODELET
 
-#include <dynamic_reconfigure/server.h>
-
+#include <realsense_camera/r200_nodelet.h>
 #include <realsense_camera/zr300_paramsConfig.h>
 #include <realsense_camera/IMUInfo.h>
 #include <realsense_camera/GetIMUInfo.h>
-#include <realsense_camera/base_nodelet.h>
 #include <sensor_msgs/Imu.h>
 
 namespace realsense_camera
 {
-  class ZR300Nodelet: public realsense_camera::BaseNodelet
+  class ZR300Nodelet: public realsense_camera::R200Nodelet
   {
   public:
 

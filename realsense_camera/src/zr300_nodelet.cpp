@@ -39,34 +39,12 @@ namespace realsense_camera
    */
   void ZR300Nodelet::onInit()
   {
-    format_[RS_STREAM_COLOR] = RS_FORMAT_RGB8;
-    encoding_[RS_STREAM_COLOR] = sensor_msgs::image_encodings::RGB8;
-    cv_type_[RS_STREAM_COLOR] = CV_8UC3;
-    unit_step_size_[RS_STREAM_COLOR] = sizeof(unsigned char) * 3;
-
-    format_[RS_STREAM_DEPTH] = RS_FORMAT_Z16;
-    encoding_[RS_STREAM_DEPTH] = sensor_msgs::image_encodings::TYPE_16UC1;
-    cv_type_[RS_STREAM_DEPTH] = CV_16UC1;
-    unit_step_size_[RS_STREAM_DEPTH] = sizeof(uint16_t);
-
-    format_[RS_STREAM_INFRARED] = RS_FORMAT_Y8;
-    encoding_[RS_STREAM_INFRARED] = sensor_msgs::image_encodings::TYPE_8UC1;
-    cv_type_[RS_STREAM_INFRARED] = CV_8UC1;
-    unit_step_size_[RS_STREAM_INFRARED] = sizeof(unsigned char);
-
-    format_[RS_STREAM_INFRARED2] = RS_FORMAT_Y8;
-    encoding_[RS_STREAM_INFRARED2] = sensor_msgs::image_encodings::TYPE_8UC1;
-    cv_type_[RS_STREAM_INFRARED2] = CV_8UC1;
-    unit_step_size_[RS_STREAM_INFRARED2] = sizeof(unsigned char);
-
     format_[RS_STREAM_FISHEYE] = RS_FORMAT_RAW8;
     encoding_[RS_STREAM_FISHEYE] = sensor_msgs::image_encodings::TYPE_8UC1;
     cv_type_[RS_STREAM_FISHEYE] = CV_8UC1;
     unit_step_size_[RS_STREAM_FISHEYE] = sizeof(unsigned char);
 
-    max_z_ = ZR300_MAX_Z;
-
-    BaseNodelet::onInit();
+    R200Nodelet::onInit();
 
     if (enable_imu_ == true)
     {
@@ -80,9 +58,7 @@ namespace realsense_camera
    */
   void ZR300Nodelet::getParameters()
   {
-    BaseNodelet::getParameters();
-    pnh_.param("ir2_frame_id", frame_id_[RS_STREAM_INFRARED2], DEFAULT_IR2_FRAME_ID);
-    pnh_.param("ir2_optical_frame_id", optical_frame_id_[RS_STREAM_INFRARED2], DEFAULT_IR2_OPTICAL_FRAME_ID);
+    R200Nodelet::getParameters();
     pnh_.param("enable_fisheye", enable_[RS_STREAM_FISHEYE], ENABLE_FISHEYE);
     pnh_.param("enable_imu", enable_imu_, ENABLE_IMU);
     pnh_.param("fisheye_width", width_[RS_STREAM_FISHEYE], FISHEYE_WIDTH);
@@ -99,11 +75,6 @@ namespace realsense_camera
    */
   void ZR300Nodelet::advertiseTopics()
   {
-    BaseNodelet::advertiseTopics();
-    ros::NodeHandle ir2_nh(nh_, IR2_NAMESPACE);
-    image_transport::ImageTransport ir2_image_transport(ir2_nh);
-    camera_publisher_[RS_STREAM_INFRARED2] = ir2_image_transport.advertiseCamera(IR2_TOPIC, 1);
-
     ros::NodeHandle fisheye_nh(nh_, FISHEYE_NAMESPACE);
     image_transport::ImageTransport fisheye_image_transport(fisheye_nh);
     camera_publisher_[RS_STREAM_FISHEYE] = fisheye_image_transport.advertiseCamera(FISHEYE_TOPIC, 1);
@@ -117,7 +88,7 @@ namespace realsense_camera
    */
   void ZR300Nodelet::advertiseServices()
   {
-    BaseNodelet::advertiseServices();
+    R200Nodelet::advertiseServices();
     get_imu_info_ = pnh_.advertiseService(IMU_INFO_SERVICE, &ZR300Nodelet::getIMUInfo, this);
   }
 
@@ -518,26 +489,7 @@ namespace realsense_camera
    */
   void ZR300Nodelet::setStreams()
   {
-    BaseNodelet::setStreams();
-
-    if (enable_[RS_STREAM_DEPTH] == true)
-    {
-      enableStream(RS_STREAM_INFRARED2, width_[RS_STREAM_DEPTH], height_[RS_STREAM_DEPTH], format_[RS_STREAM_INFRARED2],
-          fps_[RS_STREAM_DEPTH]);
-      if (camera_info_ptr_[RS_STREAM_INFRARED2] == NULL)
-      {
-        ROS_DEBUG_STREAM(nodelet_name_ << " - Allocating resources for " << STREAM_DESC[RS_STREAM_INFRARED2]);
-        getStreamCalibData(RS_STREAM_INFRARED2);
-        step_[RS_STREAM_INFRARED2] = camera_info_ptr_[RS_STREAM_INFRARED2]->width * unit_step_size_[RS_STREAM_INFRARED2];
-        image_[RS_STREAM_INFRARED2] = cv::Mat(camera_info_ptr_[RS_STREAM_INFRARED2]->height,
-            camera_info_ptr_[RS_STREAM_INFRARED2]->width, cv_type_[RS_STREAM_INFRARED2], cv::Scalar(0, 0, 0));
-      }
-      ts_[RS_STREAM_INFRARED2] = -1;
-    }
-    else if (enable_[RS_STREAM_DEPTH] == false)
-    {
-      disableStream(RS_STREAM_INFRARED2);
-    }
+    R200Nodelet::setStreams();
 
     if (enable_[RS_STREAM_FISHEYE] == true)
     {
@@ -564,9 +516,7 @@ namespace realsense_camera
    */
   void ZR300Nodelet::publishTopics()
   {
-    BaseNodelet::publishTopics();
-
-    publishTopic(RS_STREAM_INFRARED2);
+    R200Nodelet::publishTopics();
     publishTopic(RS_STREAM_FISHEYE);
   }
 
@@ -684,49 +634,15 @@ namespace realsense_camera
    */
   void ZR300Nodelet::publishStaticTransforms()
   {
-    BaseNodelet::publishStaticTransforms();
+    R200Nodelet::publishStaticTransforms();
 
-    tf::Quaternion q_i2io;
     tf::Quaternion q_f2fo;
     tf::Quaternion q_imu2imuo;
     rs_extrinsics z_extrinsic;
-    geometry_msgs::TransformStamped b2i_msg;
-    geometry_msgs::TransformStamped i2io_msg;
     geometry_msgs::TransformStamped b2f_msg;
     geometry_msgs::TransformStamped f2fo_msg;
     geometry_msgs::TransformStamped b2imu_msg;
     geometry_msgs::TransformStamped imu2imuo_msg;
-
-    // Get offset between base frame and infrared2 frame
-    rs_get_device_extrinsics(rs_device_, RS_STREAM_INFRARED2, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);
-    checkError();
-
-    // Transform base frame to infrared2 frame
-    b2i_msg.header.stamp = static_transform_ts_;
-    b2i_msg.header.frame_id = base_frame_id_;
-    b2i_msg.child_frame_id = frame_id_[RS_STREAM_INFRARED2];
-    b2i_msg.transform.translation.x =  z_extrinsic.translation[2];
-    b2i_msg.transform.translation.y = -z_extrinsic.translation[0];
-    b2i_msg.transform.translation.z = -z_extrinsic.translation[1];
-    b2i_msg.transform.rotation.x = 0;
-    b2i_msg.transform.rotation.y = 0;
-    b2i_msg.transform.rotation.z = 0;
-    b2i_msg.transform.rotation.w = 1;
-    static_tf_broadcaster_.sendTransform(b2i_msg);
-
-    // Transform infrared2 frame to infrared2 optical frame
-    q_i2io.setEuler(M_PI/2, 0.0, -M_PI/2);
-    i2io_msg.header.stamp = static_transform_ts_;
-    i2io_msg.header.frame_id = frame_id_[RS_STREAM_INFRARED2];
-    i2io_msg.child_frame_id = optical_frame_id_[RS_STREAM_INFRARED2];
-    i2io_msg.transform.translation.x = 0;
-    i2io_msg.transform.translation.y = 0;
-    i2io_msg.transform.translation.z = 0;
-    i2io_msg.transform.rotation.x = q_i2io.getX();
-    i2io_msg.transform.rotation.y = q_i2io.getY();
-    i2io_msg.transform.rotation.z = q_i2io.getZ();
-    i2io_msg.transform.rotation.w = q_i2io.getW();
-    static_tf_broadcaster_.sendTransform(i2io_msg);
 
     // Get offset between base frame and fisheye frame
     rs_get_device_extrinsics(rs_device_, RS_STREAM_FISHEYE, RS_STREAM_COLOR, &z_extrinsic, &rs_error_);

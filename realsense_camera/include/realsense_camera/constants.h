@@ -82,10 +82,7 @@ namespace realsense_camera
     const std::string IR2_TOPIC = "image_raw";
     const std::string DEFAULT_IR2_FRAME_ID = "camera_ir2_frame";
     const std::string DEFAULT_IR2_OPTICAL_FRAME_ID = "camera_ir2_optical_frame";
-
-    // R200 Constants.
-    // Indoor Range: 0.7m - 3.5m, Outdoor Range: 10m
-    const float R200_MAX_Z = 10.0f;   // in meters
+    const float R200_MAX_Z = 10.0f;   // Indoor Range: 0.7m - 3.5m, Outdoor Range: 10m
 
     // F200 Constants.
     // Indoor Range: 0.2m – 1.0m, Outdoor Range: n/a
@@ -97,7 +94,6 @@ namespace realsense_camera
 
     // ZR300 Constants.
     // Indoor Range: 0.7m - 3.5m, Outdoor Range: 10m
-    const float ZR300_MAX_Z = 10.0f;   // in meters
     const std::string FISHEYE_NAMESPACE = "fisheye";
     const std::string FISHEYE_TOPIC = "image_raw";
     const std::string IMU_NAMESPACE = "imu";
